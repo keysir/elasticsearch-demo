@@ -2,13 +2,19 @@ package com.qbian.common.es;
 
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
-import com.sun.corba.se.spi.ior.ObjectKey;
+import org.elasticsearch.action.admin.indices.exists.indices.IndicesExistsRequest;
+import org.elasticsearch.action.admin.indices.exists.indices.IndicesExistsResponse;
+import org.elasticsearch.action.admin.indices.mapping.put.PutMappingRequest;
 import org.elasticsearch.action.index.IndexRequestBuilder;
+import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.client.Requests;
 import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.text.Text;
-import org.elasticsearch.common.transport.InetSocketTransportAddress;
+import org.elasticsearch.common.transport.TransportAddress;
+import org.elasticsearch.common.xcontent.XContentBuilder;
+import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
@@ -25,9 +31,11 @@ import org.springframework.util.StringUtils;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import java.net.InetAddress;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
+
+import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 
 /**
  * Created by Qbian on 2017/5/11.
@@ -40,7 +48,7 @@ public class ElasticSearchClient {
     /**
      * 文档类型名称 =》 数据库名
      */
-    private static final String INDEX_TYPE = "test";
+    public static final String INDEX_TYPE = "test";
 
     /**
      * client
@@ -56,8 +64,8 @@ public class ElasticSearchClient {
     /**
      * 集群内节点通讯端口
      */
-    @Value("${es.port}")
-    private Integer port;
+//    @Value("${es.port}")
+//    private Integer port;
 
     /**
      * 集群名称
@@ -79,10 +87,16 @@ public class ElasticSearchClient {
                 String[] ips = ipStr.split(",");
                 for(String ip : ips) {
                     if(!StringUtils.isEmpty(ip)) {
-                        client.addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName(ip), port));
+                        String ipstr=ip.split(":")[0];
+                        Integer po=Integer.parseInt(ip.split(":")[1]);
+                        LOG.debug("ElasticSearchClient init link .", ipstr+po);
+                        client.addTransportAddress(new TransportAddress(InetAddress.getByName(ipstr),po) );
                     }
                 }
             }
+
+
+
         } catch (Exception e) {
             LOG.error("ElasticSearchClient init error .", e);
         }
@@ -102,6 +116,18 @@ public class ElasticSearchClient {
         }
     }
 
+    public void  createMapping(String type,XContentBuilder mappingBuilder){
+         try {
+             PutMappingRequest mapping = Requests.putMappingRequest(INDEX_TYPE).type(type).source(mappingBuilder
+
+             );
+             client.admin().indices().putMapping(mapping).actionGet();
+         }catch(Exception e){
+              e.printStackTrace();
+             LOG.error("error :getInfo",e.getMessage());
+         }
+    }
+
     /**
      * 创建索引，保存数据
      * @param type 文档类型
@@ -109,7 +135,9 @@ public class ElasticSearchClient {
      */
     public void  createIndex(String type, JSONObject jsonData) {
         IndexRequestBuilder requestBuilder = client.prepareIndex(INDEX_TYPE, type);
-        requestBuilder.setSource(jsonData.toJSONString()).execute().actionGet();
+        System.out.println(jsonData.toJSONString());
+        String req=jsonData.toJSONString();
+        requestBuilder.setSource(req, XContentType.JSON).execute().actionGet();
     }
 
     /**
@@ -133,13 +161,13 @@ public class ElasticSearchClient {
         if(hits != null && hits.length > 0) {
             for(SearchHit hit : hits) {
                 JSONObject data = new JSONObject();
-                for(Entry<String, Object> entry : hit.getSource().entrySet()) {
-                    data.put(entry.getKey(), entry.getValue());
+                Map<String, Object> m=  hit.getSourceAsMap();
+                for (String s : m.keySet()) {
+                    data.put(s, m.get(s));
                 }
                 result.add(data);
             }
         }
-
         return result;
     }
 
@@ -183,26 +211,38 @@ public class ElasticSearchClient {
             for(SearchHit hit : hits) {
                 Map<String, HighlightField> highlightFields = hit.getHighlightFields();
                 JSONObject data = new JSONObject();
-                for(Entry<String, Object> entry : hit.getSource().entrySet()) {
+                Map<String, Object> m=hit.getSourceAsMap();
+                for (String s : m.keySet()) {
+
                     // 保存高亮字段
-                    if(highlightFields != null && highlightFields.containsKey(entry.getKey())) {
-                        HighlightField titleField = highlightFields.get(entry.getKey());
+                    if(highlightFields != null && highlightFields.containsKey(s)) {
+                        HighlightField titleField = highlightFields.get(s);
                         Text[] fragments = titleField.fragments();
                         StringBuilder sb = new StringBuilder();
                         for(Text text : fragments) {
                             sb.append(text);
                         }
-                        data.put(entry.getKey(), sb.toString());
+                        data.put(s, sb.toString());
                     } else {
-                        data.put(entry.getKey(), entry.getValue());
+                        data.put(s, m.get(s));
                     }
-
                 }
                 result.add(data);
             }
         }
 
         return result;
+    }
+    /**
+     * 判断指定的索引名是否存在
+     * @param indexName 索引名
+     * @return  存在：true; 不存在：false;
+     */
+    public boolean isExistsIndex(String indexName){
+        IndicesExistsResponse response =
+                client.admin().indices().exists(
+                        new IndicesExistsRequest().indices(new String[]{indexName})).actionGet();
+        return response.isExists();
     }
 
 }

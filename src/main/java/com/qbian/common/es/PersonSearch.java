@@ -2,6 +2,8 @@ package com.qbian.common.es;
 
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
+import org.elasticsearch.action.get.GetResponse;
+import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.slf4j.Logger;
@@ -10,9 +12,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import javax.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
+
+import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 
 /**
  * Created by Qbian on 2017/5/11.
@@ -31,6 +36,16 @@ public class PersonSearch {
     private ElasticSearchClient client;
 
     /**
+     * 初始化
+     */
+    @PostConstruct
+    public void init() {
+        if(!client.isExistsIndex(ElasticSearchClient.INDEX_TYPE)){
+            this.createMapping();
+        }
+    }
+
+    /**
      * 保存数据到es
      * @param name 姓名
      * @param sex 性别
@@ -44,6 +59,7 @@ public class PersonSearch {
         jsonData.put("date", Calendar.getInstance().getTimeInMillis() / 1000);
 
         client.createIndex(TYPE, jsonData);
+
     }
 
     /**
@@ -73,5 +89,33 @@ public class PersonSearch {
 
         return client.search(queryBuilder, TYPE, pageNo, pageSize);
     }
+
+    public void createMapping(){
+         try {
+             XContentBuilder mappingBuilder=    jsonBuilder()
+                     .startObject()
+                     .field("name",
+                             jsonBuilder().startObject()
+                                     .field("type","text")
+                                     .field("analyzer","ik_max_word")
+                                     .field("search_analyzer","ik_max_word")
+                                     .endObject()
+                     )
+                     .field("interest",
+                             jsonBuilder().startObject()
+                                     .field("type","text")
+                                     .field("analyzer","ik_max_word")
+                                     .field("search_analyzer","ik_max_word")
+                                     .endObject()
+                     )
+                     .endObject();
+             client.createMapping(TYPE,mappingBuilder);
+         }catch(Exception e){
+              e.printStackTrace();
+              LOG.error("error :getInfo",e.getMessage());
+         }
+
+    }
+
 
 }
