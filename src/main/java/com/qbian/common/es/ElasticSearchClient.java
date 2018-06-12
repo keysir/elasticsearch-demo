@@ -118,9 +118,10 @@ public class ElasticSearchClient {
 
     public void  createMapping(String type,XContentBuilder mappingBuilder){
          try {
-             PutMappingRequest mapping = Requests.putMappingRequest(INDEX_TYPE).type(type).source(mappingBuilder
-
-             );
+             PutMappingRequest mapping = Requests.putMappingRequest(INDEX_TYPE).type(type).source(mappingBuilder);
+             if(!isExistsIndex(INDEX_TYPE)){
+                 client.admin().indices().prepareCreate(INDEX_TYPE).execute().actionGet();
+             }
              client.admin().indices().putMapping(mapping).actionGet();
          }catch(Exception e){
               e.printStackTrace();

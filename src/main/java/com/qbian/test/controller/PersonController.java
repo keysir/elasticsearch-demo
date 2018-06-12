@@ -65,6 +65,22 @@ public class PersonController {
         return new ResponseDto(result);
     }
 
+    /**
+     * @author  lumeng
+    * @Description:
+     * @return
+     */
+    @GetMapping("/maps")
+    ResponseDto<Object> maps() {
+        ResponseDto<Object> httpResponseDto = new ResponseDto<Object>();
+        try {
+            personSearch.createMapping();
+        }catch(Exception e){
+         e.printStackTrace();
+        }
+        return httpResponseDto;
+    }
+
 
 
 }

@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.common.xcontent.XContentBuilder;
+import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.slf4j.Logger;
@@ -34,16 +35,6 @@ public class PersonSearch {
 
     @Autowired
     private ElasticSearchClient client;
-
-    /**
-     * 初始化
-     */
-    @PostConstruct
-    public void init() {
-        if(!client.isExistsIndex(ElasticSearchClient.INDEX_TYPE)){
-            this.createMapping();
-        }
-    }
 
     /**
      * 保存数据到es
@@ -92,24 +83,16 @@ public class PersonSearch {
 
     public void createMapping(){
          try {
-             XContentBuilder mappingBuilder=    jsonBuilder()
-                     .startObject()
-                     .field("name",
-                             jsonBuilder().startObject()
-                                     .field("type","text")
-                                     .field("analyzer","ik_max_word")
-                                     .field("search_analyzer","ik_max_word")
-                                     .endObject()
-                     )
-                     .field("interest",
-                             jsonBuilder().startObject()
-                                     .field("type","text")
-                                     .field("analyzer","ik_max_word")
-                                     .field("search_analyzer","ik_max_word")
-                                     .endObject()
-                     )
-                     .endObject();
-             client.createMapping(TYPE,mappingBuilder);
+             client.createMapping(TYPE,
+                     jsonBuilder()
+                         .startObject()
+                             .startObject("properties")
+                             //      .startObject("m_id").field("type","keyword").endObject()
+                             .startObject("name") .field("type","text").field("analyzer","ik_max_word").field("search_analyzer","ik_max_word").endObject()
+                             .startObject("interest") .field("type","text").field("analyzer","ik_max_word").field("search_analyzer","ik_max_word").endObject()
+                         .endObject()
+                     .endObject()
+                     );
          }catch(Exception e){
               e.printStackTrace();
               LOG.error("error :getInfo",e.getMessage());
