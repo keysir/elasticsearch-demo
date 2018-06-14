@@ -23,10 +23,16 @@
         </layout>
     </appender>
 
-    <logger name="com.getto1" additivity="false">
+    <logger name="com.getto1" additivity="false" >
         <appender-ref ref="console"/>
         <appender-ref ref="logFile" />
     </logger>
+
+    <logger name="org.elasticsearch.client" additivity="false"  level="debug">
+        <appender-ref ref="console"/>
+    </logger>
+
+
 
     <root level="error">
         <appender-ref ref="console"/>

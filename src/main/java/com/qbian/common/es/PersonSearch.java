@@ -69,7 +69,8 @@ public class PersonSearch {
             queryBuilder.must(QueryBuilders.matchPhraseQuery("sex", sex));
         }
         if(!StringUtils.isEmpty(name)) {
-            queryBuilder.must(QueryBuilders.matchPhraseQuery("name", name));
+            queryBuilder.should(QueryBuilders.termsQuery("name.item_title_ik", name));
+            queryBuilder.should(QueryBuilders.termsQuery("name.item_title_pinyin",name));
         }
         if(!StringUtils.isEmpty(interest)) {
             queryBuilder.must(QueryBuilders.matchPhraseQuery("interest", interest));
@@ -87,7 +88,6 @@ public class PersonSearch {
                      jsonBuilder()
                          .startObject()
                              .startObject("properties")
-                             //      .startObject("m_id").field("type","keyword").endObject()
                              .startObject("name") .field("type","text").field("analyzer","ik_max_word").field("search_analyzer","ik_max_word").endObject()
                              .startObject("interest") .field("type","text").field("analyzer","ik_max_word").field("search_analyzer","ik_max_word").endObject()
                          .endObject()
@@ -97,7 +97,6 @@ public class PersonSearch {
               e.printStackTrace();
               LOG.error("error :getInfo",e.getMessage());
          }
-
     }
 
 

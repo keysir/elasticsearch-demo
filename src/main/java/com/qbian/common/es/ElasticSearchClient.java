@@ -2,9 +2,16 @@ package com.qbian.common.es;
 
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
+import org.elasticsearch.action.ActionFuture;
+import org.elasticsearch.action.IndicesRequest;
+import org.elasticsearch.action.admin.indices.close.CloseIndexRequest;
+import org.elasticsearch.action.admin.indices.close.CloseIndexResponse;
 import org.elasticsearch.action.admin.indices.exists.indices.IndicesExistsRequest;
 import org.elasticsearch.action.admin.indices.exists.indices.IndicesExistsResponse;
 import org.elasticsearch.action.admin.indices.mapping.put.PutMappingRequest;
+import org.elasticsearch.action.admin.indices.open.OpenIndexRequest;
+import org.elasticsearch.action.admin.indices.settings.put.UpdateSettingsRequest;
+import org.elasticsearch.action.admin.indices.settings.put.UpdateSettingsResponse;
 import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.search.SearchResponse;
@@ -36,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
+import static org.elasticsearch.common.xcontent.XContentFactory.xContent;
 
 /**
  * Created by Qbian on 2017/5/11.
@@ -94,9 +102,6 @@ public class ElasticSearchClient {
                     }
                 }
             }
-
-
-
         } catch (Exception e) {
             LOG.error("ElasticSearchClient init error .", e);
         }
@@ -118,16 +123,67 @@ public class ElasticSearchClient {
 
     public void  createMapping(String type,XContentBuilder mappingBuilder){
          try {
-             PutMappingRequest mapping = Requests.putMappingRequest(INDEX_TYPE).type(type).source(mappingBuilder);
+             String settingsSource="{\n" +
+                     "\t   \"analysis\": {\n" +
+                     "\t      \"analyzer\" : {\n" +
+                     "                \"pinyin_analyzer\" : {\n" +
+                     "                    \"tokenizer\" : \"my_pinyin\"\n" +
+                     "                    }\n" +
+                     "            },\n" +
+                     "            \"tokenizer\" : {\n" +
+                     "                \"my_pinyin\" : {\n" +
+                     "                    \"type\" : \"pinyin\",\n" +
+                     "                    \"keep_separate_first_letter\" : false,\n" +
+                     "                    \"keep_full_pinyin\" : true,\n" +
+                     "                    \"keep_original\" : true,\n" +
+                     "                    \"limit_first_letter_length\" : 16,\n" +
+                     "                    \"lowercase\" : true,\n" +
+                     "                    \"remove_duplicated_term\" : true\n" +
+                     "                }\n" +
+                     "            }\n" +
+                     "\t   }\n" +
+                     "\t\t}";
+                    String mapString="{\n" +
+                            "      \"properties\": {\n" +
+                            "        \"name\": {\n" +
+                            "          \"type\": \"text\",\n" +
+                            "          \"fields\": {\n" +
+                            "           \"item_title_ik\" : {\"type\" : \"text\", \"analyzer\" :\"ik_max_word\",\"search_analyzer\":\"ik_max_word\"},\n" +
+                            "\t\t   \"item_title_pinyin\" : {\"type\" : \"text\", \"analyzer\" :\"pinyin_analyzer\",\"search_analyzer\":\"pinyin_analyzer\"}\n" +
+                            "        }\n" +
+                            "      },\n" +
+                            "      \"interest\": {\n" +
+                            "      \t\"type\": \"text\",\n" +
+                            "      \t\"analyzer\": \"ik_max_word\",\n" +
+                            "      \t\"search_analyzer\": \"ik_max_word\"\n" +
+                            "      }\n" +
+                            "    }\n" +
+                            "  }";
              if(!isExistsIndex(INDEX_TYPE)){
-                 client.admin().indices().prepareCreate(INDEX_TYPE).execute().actionGet();
+                 client.admin().indices().prepareCreate(INDEX_TYPE).setSettings(settingsSource,XContentType.JSON).addMapping("person",mapString,XContentType.JSON).execute().actionGet();
+//                 client.admin().indices().prepareCreate(INDEX_TYPE).execute().actionGet();
              }
+
+
+//             //更改设置先关闭index
+//             CloseIndexRequest requestclose=Requests.closeIndexRequest(INDEX_TYPE);
+//             client.admin().indices().close(requestclose);
+//
+//             UpdateSettingsRequest updateSettingsRequest=Requests.updateSettingsRequest(INDEX_TYPE).settings(source,XContentType.JSON);
+//             ActionFuture<UpdateSettingsResponse> re=client.admin().indices().updateSettings(updateSettingsRequest);
+//             System.out.println(JSONObject.toJSONString(re));
+//
+//             OpenIndexRequest requestopen=Requests.openIndexRequest(INDEX_TYPE);
+//             client.admin().indices().open(requestopen);
+
+             PutMappingRequest mapping = Requests.putMappingRequest(INDEX_TYPE).type(type).source(mappingBuilder);
              client.admin().indices().putMapping(mapping).actionGet();
          }catch(Exception e){
               e.printStackTrace();
              LOG.error("error :getInfo",e.getMessage());
          }
     }
+
 
     /**
      * 创建索引，保存数据
